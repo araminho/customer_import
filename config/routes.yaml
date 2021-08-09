@@ -1,0 +1,4 @@
+
+customers_list:
+    path: /customers
+    controller: App\Controller\CustomerController::index

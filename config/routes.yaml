@@ -2,3 +2,9 @@
 customers_list:
     path: /customers
     controller: App\Controller\CustomerController::index
+
+single_customer:
+    path:       /customers/{id}
+    controller: App\Controller\CustomerController::show
+    requirements:
+        id: '\d+'

@@ -42,10 +42,12 @@ class CustomerImportCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->customerApi->import(
+        $customers = $this->customerApi->getFromApi(
             $input->getArgument('count') ?? 100,
             $input->getArgument('country_code') ?? 'AU'
         );
+        $result = $this->customerApi->insertToDb($customers);
+        $output->write("Inserted: " . $result['inserted'] . ", updated: " . $result['updated']);
         return Command::SUCCESS;
     }
 }

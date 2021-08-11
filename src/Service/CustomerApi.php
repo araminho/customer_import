@@ -26,7 +26,7 @@ class CustomerApi
         $this->em = $em;
     }
 
-    public function import(int $count, string $countryCode): bool
+    public function getFromApi(int $count, string $countryCode): array
     {
         try {
             $response = $this->client->request(
@@ -36,43 +36,78 @@ class CustomerApi
                     'query' => [
                         'results' => $count,
                         'nat' => $countryCode,
+                        // 'seed' => 'constant_seed'    // uncomment this to get the same results after every request
                     ]
                 ]
             );
             $content = json_decode($response->getContent(), true);
             if (!empty($content['error'])) {
                 echo $content['error'];
-                return false;
+                return [];
             }
             $content = $content['results'];
 
-            foreach ($content as $customer) {
+            $customerList = [];
+            if (!empty($content)) {
+                foreach ($content as $row) {
+                    $customerList[] = [
+                        'first_name' => $row['name']['first'],
+                        'last_name' => $row['name']['last'],
+                        'email' => $row['email'],
+                        'country_code' => $row['nat'],
+                        'username' => $row['login']['username'],
+                        'gender' => $row['gender'],
+                        'city' => $row['location']['city'],
+                        'phone' => $row['phone'],
+                    ];
+                }
+            }
+        } catch (HttpExceptionInterface $e) {
+            echo $e->getMessage();
+            return [];
+        }
+        return $customerList;
+    }
+
+    public function insertToDb(array $customersList): array
+    {
+        $insertedCount = 0;
+        $updatedCount = 0;
+        if (!empty($customersList)) {
+            foreach ($customersList as $customer) {
+                if (!isset($customer['email']) || !isset($customer['first_name']) || !isset($customer['last_name'])
+                    || !isset($customer['country_code']) || !isset($customer['username']) || !isset($customer['gender'])
+                    || !isset($customer['city']) || !isset($customer['phone'])
+                ) {
+                    continue;
+                }
                 $existingCustomer = $this->em->getRepository(Customer::class)
                     ->findBy(['email' => $customer['email']]);
 
                 if (!empty($existingCustomer)) {
                     $customerObject = $existingCustomer[0];
+                    $updatedCount++;
                 } else {
                     $customerObject = new Customer();
                     $customerObject->setEmail($customer['email']);
+                    $insertedCount++;
                 }
 
-                $customerObject->setFirstName($customer['name']['first']);
-                $customerObject->setLastName($customer['name']['last']);
-                $customerObject->setCountryCode($customer['nat']);
-                $customerObject->setUsername($customer['login']['username']);
+                $customerObject->setFirstName($customer['first_name']);
+                $customerObject->setLastName($customer['last_name']);
+                $customerObject->setCountryCode($customer['country_code']);
+                $customerObject->setUsername($customer['username']);
                 $customerObject->setGender($customer['gender']);
-                $customerObject->setCity($customer['location']['city']);
+                $customerObject->setCity($customer['city']);
                 $customerObject->setPhone($customer['phone']);
 
                 $this->em->persist($customerObject);
                 $this->em->flush();
             }
-
-        } catch (HttpExceptionInterface $e) {
-            echo $e->getMessage();
-            return false;
         }
-        return true;
+        return [
+            'inserted' => $insertedCount,
+            'updated' => $updatedCount,
+        ];
     }
 }
